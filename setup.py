@@ -35,7 +35,7 @@ setup(
     packages = ["jsonrpc2_zeromq"],
     install_requires=[
         "distribute",
-        "pyzmq<2.2",
+        "pyzmq==14.3.0",
         ],
     )
 

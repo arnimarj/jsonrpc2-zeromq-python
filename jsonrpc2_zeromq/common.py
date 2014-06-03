@@ -3,7 +3,6 @@
 # Please see the LICENSE file in the root of this project for license
 # information.
 
-import sys
 import uuid
 import json
 import re
@@ -245,7 +244,7 @@ class Endpoint(object):
     socket = None
 
     def __init__(self, endpoint, socket_type, timeout, context=None,
-                 logger=None):
+                 logger='default'):
         super(Endpoint, self).__init__()
         self.endpoint = endpoint
 
@@ -258,7 +257,9 @@ class Endpoint(object):
 
         self.timeout = timeout
         self.context = context or zmq.Context.instance()
-        self.logger = logger if logger else package_logger
+        print 'L', logger
+        self.logger = logger if logger != 'default' else package_logger
+        assert(self.logger is None)
 
     def close(self):
         self.socket.close()

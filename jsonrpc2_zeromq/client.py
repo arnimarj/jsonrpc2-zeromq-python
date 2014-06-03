@@ -22,7 +22,7 @@ class RPCClient(common.Endpoint):
     socket = None
 
     def __init__(self, endpoint, context=None, timeout=5000,
-                 socket_type=None, logger=None):
+                 socket_type=None, logger='default'):
         super(RPCClient, self).__init__(endpoint, socket_type, timeout, context,
                                         logger)
         self.notify = NotifierProxy(self)
@@ -40,10 +40,11 @@ class RPCClient(common.Endpoint):
         self.request_sock = self.socket
 
     def request(self, request):
-        self.logger.debug(">_> Client calling \"{method}\" on {endpoint} "
-                       "with params:\n{params}".format(method=request.method,
-                           endpoint=self.endpoint,
-                           params=common.debug_log_object_dump(request.params)))
+        if self.logger is not None:
+            self.logger.debug(">_> Client calling \"{method}\" on {endpoint} "
+                           "with params:\n{params}".format(method=request.method,
+                               endpoint=self.endpoint,
+                               params=common.debug_log_object_dump(request.params)))
 
         self.request_poller.register(self.request_sock, zmq.POLLOUT)
         if not self.request_poller.poll(self.timeout):
@@ -57,10 +58,11 @@ class RPCClient(common.Endpoint):
 
         if request.id is None: return # We don't get a response for notifications
 
-        self.logger.debug("-.- Client waiting for response from {method} "
-                       "on {endpoint}".format(method=request.method,
-                           endpoint=self.endpoint,
-                           params=common.debug_log_object_dump(request.params)))
+        if self.logger is not None:
+            self.logger.debug("-.- Client waiting for response from {method} "
+                           "on {endpoint}".format(method=request.method,
+                               endpoint=self.endpoint,
+                               params=common.debug_log_object_dump(request.params)))
         self.request_poller.register(self.request_sock, zmq.POLLIN)
         if not self.request_poller.poll(self.timeout):
             self.on_timeout(request)
@@ -78,11 +80,12 @@ class RPCClient(common.Endpoint):
         if response.is_error:
             raise response.error_exception(self.error_code_exceptions)
 
-        self.logger.debug("<_< Client received from call of \"{method}\""
-                          " on {endpoint}:\n{result}".format(
-                              method=request.method,
-                              endpoint=self.endpoint,
-                              result=common.debug_log_object_dump(response.result)))
+        if self.logger != None:
+            self.logger.debug("<_< Client received from call of \"{method}\""
+                              " on {endpoint}:\n{result}".format(
+                                  method=request.method,
+                                  endpoint=self.endpoint,
+                                  result=common.debug_log_object_dump(response.result)))
         return response.result
 
     def on_timeout(self, req):
@@ -159,27 +162,29 @@ class NotificationReceiverClient(RPCNotifierClient, threading.Thread):
                     thread_pair_sock.send(common.json_rpc_dumps(msg))
                     request_id = None
                 elif not msg.id:
-                    self.logger.debug("<_< Client received notification "
-                                      "\"{method}\" "
-                                      "from subscription on {endpoint}:\n"
-                                      "{result}".format(
-                                          endpoint=self.endpoint,
-                                          method=msg.method,
-                                          result=common.debug_log_object_dump(
-                                              msg.params)
-                                      ))
+                    if self.logger is not None:
+                        self.logger.debug("<_< Client received notification "
+                                          "\"{method}\" "
+                                          "from subscription on {endpoint}:\n"
+                                          "{result}".format(
+                                              endpoint=self.endpoint,
+                                              method=msg.method,
+                                              result=common.debug_log_object_dump(
+                                                  msg.params)
+                                          ))
 
                     try:
                         common.handle_request(self,
                                               'handle_{method}_notification',
                                                msg)
                     except common.MethodNotFound:
-                        self.logger.warning("v_v Client has no handler for "
-                                            "\"{method}\" notification from "
-                                            "subscription on {endpoint}".format(
-                                                method=msg.method,
-                                                endpoint=self.endpoint
-                                            ))
+                        if self.logger is not None:
+                            self.logger.warning("v_v Client has no handler for "
+                                                "\"{method}\" notification from "
+                                                "subscription on {endpoint}".format(
+                                                    method=msg.method,
+                                                    endpoint=self.endpoint
+                                                ))
 
     def on_timeout(self, *args, **kwargs):
         self.stop()

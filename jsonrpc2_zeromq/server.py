@@ -25,7 +25,7 @@ class RPCServer(common.Endpoint, threading.Thread):
     should_stop = False
 
     def __init__(self, endpoint, context=None, timeout=1000, socket_type=None,
-                 logger=None):
+                 logger='default'):
         super(RPCServer, self).__init__(endpoint, socket_type, timeout, context,
                                         logger=logger)
         self.socket = self.context.socket(self.socket_type)
@@ -37,7 +37,8 @@ class RPCServer(common.Endpoint, threading.Thread):
         self.should_stop = True
 
     def run(self):
-        self.logger.info("^_^ Server now listening on %s", self.endpoint)
+        if self.logger is not None:
+            self.logger.info("^_^ Server now listening on %s", self.endpoint)
         while not self.should_stop:
             self._handle_one_message()
 
@@ -63,13 +64,14 @@ class RPCServer(common.Endpoint, threading.Thread):
             if not isinstance(req, common.Request):
                 raise common.InvalidRequest()
 
-            self.logger.debug("<_< Server received {req_type} \"{method}\""
-                              " on {endpoint} with params:\n{params}".format(
-                                  req_type=("method call" if req.id
-                                            else "notification"),
-                                  method=req.method, endpoint=self.endpoint,
-                                  params=common.debug_log_object_dump(
-                                      req.params)))
+            if self.logger is not None:
+                self.logger.debug("<_< Server received {req_type} \"{method}\""
+                                  " on {endpoint} with params:\n{params}".format(
+                                      req_type=("method call" if req.id
+                                                else "notification"),
+                                      method=req.method, endpoint=self.endpoint,
+                                      params=common.debug_log_object_dump(
+                                          req.params)))
 
             if (req.is_method and self.allow_methods) or \
                     (req.is_notification and self.allow_notifications):
@@ -87,9 +89,10 @@ class RPCServer(common.Endpoint, threading.Thread):
             req_id = req.id if req else None
             self._send_response(client_id, req,
                                 response_from_exception(e, req_id))
-            if not isinstance(e, common.RPCError):
-                self.logger.exception("Exception handling message in %s",
-                                      self.__class__.__name__)
+            if self.logger is not None:
+                if not isinstance(e, common.RPCError):
+                    self.logger.exception("Exception handling message in %s",
+                                          self.__class__.__name__)
 
     def _handle_method_and_response(self, client_id, req):
         result = common.handle_request(self, 'handle_{method}_method', req)
@@ -111,7 +114,8 @@ class RPCServer(common.Endpoint, threading.Thread):
             if resp.is_error
             else common.debug_log_object_dump(resp.result))
 
-        self.logger.debug(' '.join(debug_msg_parts) + debug_msg_result)
+        if self.logger is not None:
+            self.logger.debug(' '.join(debug_msg_parts) + debug_msg_result)
 
         self.socket.send_multipart(filter(None,
                                           [client_id,
